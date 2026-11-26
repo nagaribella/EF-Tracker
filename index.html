@@ -268,6 +268,9 @@ button.avatar{border:0;padding:0}
 .busy::after{content:"";position:absolute;inset:0 auto 0 -40%;width:40%;background:var(--pink);animation:slide 1s ease-in-out infinite}
 @keyframes slide{to{left:100%}}
 .btn[aria-busy="true"]{opacity:.6}
+.errcard{border:2px solid var(--pink);margin-bottom:18px}
+.errcard h2{color:var(--pink-ink);margin-bottom:6px}
+.errcard p{margin:0 0 14px;color:var(--ink);font-size:14px;overflow-wrap:anywhere}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -446,17 +449,36 @@ async function api(action,payload){
   try{
     const res=await fetch(C.API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
       body:JSON.stringify(Object.assign({action,idToken},payload||{}))});
-    const j=await res.json();
+    const txt=await res.text(); let j;
+    try{ j=JSON.parse(txt); }
+    catch(e){ throw new Error(/<html|<!doctype/i.test(txt)
+      ? "The API sent back a web page, not data. Check that API_URL in config.js ends with /exec and the deployment access is set to Anyone."
+      : "The API sent back something unexpected (HTTP "+res.status+")."); }
     if(!j.ok){ if(/^AUTH/.test(j.error||"")) signOut("Your session ended. Sign in again."); throw new Error(j.error||"Request failed"); }
     return j;
   } finally { busy(false); }
 }
+function showError(msg){
+  let b=$("loadErr");
+  if(!msg){ if(b) b.remove(); return; }
+  if(!b){ b=document.createElement("div"); b.id="loadErr"; b.className="card errcard"; b.setAttribute("role","alert");
+    document.querySelector("main").prepend(b); }
+  b.innerHTML='<h2>Couldn’t load your data</h2><p>'+esc(msg)+'</p><button class="btn" id="retryBtn">Try again</button>';
+  $("retryBtn").onclick=refresh;
+}
 async function refresh(){
+  if(!C.API_URL || /PASTE/.test(C.API_URL)){ showError("API_URL in config.js is still the placeholder. Paste your Apps Script web app URL (ends with /exec)."); return; }
   try{
     const data=await api("bootstrap");
     try{ localStorage.setItem(CACHE,JSON.stringify(data)); }catch(e){}
-    applyData(data); render();
-  }catch(err){ if(!/^AUTH/.test(err.message)) toast("Couldn’t load from the sheet. Showing your last saved copy."); }
+    showError(null); applyData(data); render();
+  }catch(err){
+    if(/^AUTH/.test(err.message)) return;
+    let m=err.message;
+    if(/getDataRange|null/i.test(m)) m="The sheet is missing the APP_CONFIG, APP_PLAN or APP_LOG tab. Run setup() in Apps Script, then try again. ("+m+")";
+    else if(/Failed to fetch|NetworkError|Load failed/i.test(m)) m="Couldn’t reach the API. Check your connection and that API_URL in config.js is correct.";
+    showError(ready()? m+" Showing your last saved copy." : m);
+  }
 }
 
 // ---------- auth (Google Identity Services) ----------

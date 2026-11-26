@@ -1,6 +1,6 @@
 // My EF Goals service worker: caches the app shell so it opens fast from the home screen.
 // Data always comes live from Apps Script (never cached here).
-const VERSION = "efgoals-v1";
+const VERSION = "efgoals-v2";
 const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-32.png"];
 
